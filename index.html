@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Builder for the Indian Job Market</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .premium-overlay {
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .font-sans {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .form-switch {
+            @apply relative inline-flex items-center h-6 rounded-full w-11 cursor-pointer;
+        }
+        .form-switch input {
+            @apply sr-only;
+        }
+        .form-switch .slider {
+            @apply absolute inset-0 transition-all duration-300 bg-gray-300 rounded-full;
+        }
+        .form-switch .slider::before {
+            @apply absolute content-[''] w-4 h-4 transition-all duration-300 bg-white rounded-full shadow-sm top-1 left-1;
+        }
+        .form-switch input:checked + .slider {
+            @apply bg-indigo-600;
+        }
+        .form-switch input:checked + .slider::before {
+            @apply transform translate-x-5;
+        }
+        .dragging {
+            opacity: 0.5;
+            background: #f0f4ff;
+        }
+        .drag-over {
+            border-top: 2px solid #4f46e5;
+        }
+        /* PDF Export Page Break Control */
+        .pdf-section-break, .pdf-item-break {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        
+        /* New styles for scaled preview */
+        #scale-wrapper {
+            margin: 0 auto;
+        }
+
+        #resume-output {
+            width: 21cm;
+            min-height: 29.7cm;
+            box-sizing: border-box;
+            transform-origin: top left;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            background-color: white;
+            transition: transform 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="app" class="flex flex-col lg:flex-row h-screen">
+
+        <!-- Left Panel: Controls & Inputs -->
+        <aside class="w-full lg:w-1/2 xl:w-2/5 p-6 bg-white overflow-y-auto">
+            <header class="mb-6">
+                <h1 class="text-3xl font-bold text-gray-900">Resume Builder</h1>
+                <p class="text-gray-600 mt-1">Optimized for the Indian Job Market <span class="text-indigo-600 font-semibold">[IN]</span></p>
+            </header>
+            
+            <div id="premium-toggle-container" class="mb-6 p-4 bg-indigo-50 border-2 border-indigo-200 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles text-indigo-600 mr-3"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+                        <h3 class="text-lg font-semibold text-gray-800">Unlock Premium</h3>
+                    </div>
+                    <label for="premium-toggle" class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="premium-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">Unlock premium templates for a professional edge.</p>
+            </div>
+
+
+            <!-- Accordion for sections -->
+            <div class="space-y-4">
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-manage-sections">
+                        Manage & Reorder Sections
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-manage-sections" class="accordion-content p-4 border-t border-gray-200 space-y-2">
+                        <!-- Draggable section toggles will be injected here by JS -->
+                    </div>
+                </div>
+
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="photo">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-photo">
+                        Profile Photo
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-photo" class="accordion-content p-4 border-t border-gray-200 hidden">
+                         <div class="flex items-center space-x-4">
+                            <img id="photo-preview" src="https://placehold.co/100x100/E2E8F0/4A5568?text=Photo" class="w-24 h-24 rounded-full object-cover border-2 border-gray-200">
+                            <div class="space-y-2">
+                                <label for="photo-upload" class="cursor-pointer bg-white border border-gray-300 text-gray-700 text-sm font-semibold py-2 px-4 rounded-md hover:bg-gray-50">
+                                    Upload Photo
+                                </label>
+                                <input type="file" id="photo-upload" class="hidden" accept="image/*">
+                                <button id="remove-photo" class="text-red-500 text-sm hover:underline">Remove Photo</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="personalDetails">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-personal">
+                        Personal Details
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-personal" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input type="text" placeholder="Full Name (e.g., Anjali Sharma)" id="name" class="p-2 border rounded-md w-full" data-resume="name">
+                            <input type="text" placeholder="Job Title (e.g., Senior Software Engineer)" id="job_title" class="p-2 border rounded-md w-full" data-resume="job_title">
+                            <input type="email" placeholder="Email (e.g., anjali.sharma@email.com)" id="email" class="p-2 border rounded-md w-full" data-resume="email">
+                            <input type="tel" placeholder="Phone (e.g., +91 98765 43210)" id="phone" class="p-2 border rounded-md w-full" data-resume="phone">
+                            <input type="text" placeholder="Location (e.g., Bengaluru, India)" id="location" class="p-2 border rounded-md w-full" data-resume="location">
+                            <input type="url" placeholder="LinkedIn Profile URL" id="linkedin" class="p-2 border rounded-md w-full" data-resume="linkedin">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="summary">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-summary">
+                        Professional Summary
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-summary" class="accordion-content p-4 border-t border-gray-200 hidden">
+                         <textarea placeholder="Professional Summary: A brief 2-3 sentence overview of your skills and experience." id="summary" class="p-2 border rounded-md w-full h-24" data-resume="summary"></textarea>
+                    </div>
+                </div>
+
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="workExperience">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-experience">
+                        Work Experience
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-experience" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div id="experience-list"></div>
+                        <button id="add-experience" class="mt-2 text-indigo-600 font-semibold hover:text-indigo-800">+ Add Work Experience</button>
+                    </div>
+                </div>
+                
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="internshipExperience">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-internships">
+                        Internship Experiences
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-internships" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div id="internship-list"></div>
+                        <button id="add-internship" class="mt-2 text-indigo-600 font-semibold hover:text-indigo-800">+ Add Internship</button>
+                    </div>
+                </div>
+
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="education">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-education">
+                        Education
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-education" class="accordion-content p-4 border-t border-gray-200 hidden">
+                         <div id="education-list"></div>
+                        <button id="add-education" class="mt-2 text-indigo-600 font-semibold hover:text-indigo-800">+ Add Education</button>
+                    </div>
+                </div>
+
+                 <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="technicalSkills">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-tech-skills">
+                        Technical Skills
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-tech-skills" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <textarea placeholder="e.g., Python, Machine Learning, React.js" id="technicalSkills" class="p-2 border rounded-md w-full h-24" data-resume="technicalSkills"></textarea>
+                    </div>
+                </div>
+
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="softSkills">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-soft-skills">
+                        Soft Skills
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-soft-skills" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <textarea placeholder="e.g., Project Management, Team Leadership" id="softSkills" class="p-2 border rounded-md w-full h-24" data-resume="softSkills"></textarea>
+                    </div>
+                </div>
+                
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="certifications">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-certifications">
+                        Certifications
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-certifications" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div id="certifications-list"></div>
+                        <button id="add-certification" class="mt-2 text-indigo-600 font-semibold hover:text-indigo-800">+ Add Certification</button>
+                    </div>
+                </div>
+                
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="achievements">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-achievements">
+                        Achievements
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-achievements" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div id="achievements-list"></div>
+                        <button id="add-achievement" class="mt-2 text-indigo-600 font-semibold hover:text-indigo-800">+ Add Achievement</button>
+                    </div>
+                </div>
+                
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="volunteering">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-volunteering">
+                        Volunteering
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-volunteering" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div id="volunteering-list"></div>
+                        <button id="add-volunteering" class="mt-2 text-indigo-600 font-semibold hover:text-indigo-800">+ Add Volunteering</button>
+                    </div>
+                </div>
+                
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="hackathons">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-hackathons">
+                        Hackathons & Competitions
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-hackathons" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div id="hackathons-list"></div>
+                        <button id="add-hackathon" class="mt-2 text-indigo-600 font-semibold hover:text-indigo-800">+ Add Entry</button>
+                    </div>
+                </div>
+                
+                <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200 section-input" data-section-key="extracurriculars">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-extracurriculars">
+                        Extracurriculars
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-extracurriculars" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div id="extracurriculars-list"></div>
+                        <button id="add-extracurricular" class="mt-2 text-indigo-600 font-semibold hover:text-indigo-800">+ Add Activity</button>
+                    </div>
+                </div>
+                
+                 <div class="accordion-item bg-gray-50 rounded-lg border border-gray-200">
+                    <button class="accordion-header w-full text-left p-4 font-semibold text-gray-700 flex justify-between items-center" data-target="#section-templates">
+                        Templates & Styling
+                        <i data-lucide="chevron-down" class="transition-transform"></i>
+                    </button>
+                    <div id="section-templates" class="accordion-content p-4 border-t border-gray-200 hidden">
+                        <div class="grid grid-cols-2 gap-4">
+                           <div class="relative">
+                                <img src="https://placehold.co/400x565/E2E8F0/4A5568?text=Modern" alt="Modern Template" class="rounded-md cursor-pointer border-2 border-indigo-500" data-template="modern">
+                               <p class="text-center font-semibold mt-1">Modern</p>
+                           </div>
+                           <div class="relative">
+                               <img src="https://placehold.co/400x565/E2E8F0/4A5568?text=Classic" alt="Classic Template" class="rounded-md cursor-pointer border-2 border-transparent" data-template="classic">
+                               <p class="text-center font-semibold mt-1">Classic</p>
+                           </div>
+                           <div class="relative">
+                                <img src="https://placehold.co/400x565/E2E8F0/4A5568?text=ATS+Friendly" alt="ATS Friendly Template" class="rounded-md cursor-pointer border-2 border-transparent" data-template="ats">
+                               <p class="text-center font-semibold mt-1">ATS Friendly</p>
+                               <div id="premium-ats-overlay" class="absolute inset-0 bg-gray-200 bg-opacity-75 premium-overlay flex items-center justify-center text-center p-2 rounded-md">
+                                  <span class="text-sm font-bold text-gray-700"><i data-lucide="lock" class="w-4 h-4 inline-block mr-1"></i>Premium</span>
+                               </div>
+                           </div>
+                           <div class="relative">
+                               <img src="https://placehold.co/400x565/E2E8F0/4A5568?text=Creative" alt="Creative Template" class="rounded-md cursor-pointer border-2 border-transparent" data-template="creative">
+                               <p class="text-center font-semibold mt-1">Creative</p>
+                               <div id="premium-creative-overlay" class="absolute inset-0 bg-gray-200 bg-opacity-75 premium-overlay flex items-center justify-center text-center p-2 rounded-md">
+                                  <span class="text-sm font-bold text-gray-700"><i data-lucide="lock" class="w-4 h-4 inline-block mr-1"></i>Premium</span>
+                               </div>
+                           </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <button id="download-pdf" class="mt-8 w-full bg-green-600 text-white font-bold py-3 px-4 rounded-md hover:bg-green-700 transition-colors flex items-center justify-center text-lg">
+                <i data-lucide="download" class="mr-2"></i>Download as PDF
+            </button>
+
+        </aside>
+
+        <!-- Right Panel: Resume Preview -->
+        <main id="preview-panel" class="hidden lg:flex w-full lg:w-1/2 xl:w-3/5 p-4 md:p-6 bg-gray-200 bg-opacity-95 lg:bg-gray-200 justify-center overflow-auto fixed lg:relative inset-0 z-30">
+            <button id="close-preview-btn" class="lg:hidden fixed top-4 right-4 bg-white p-2 rounded-full shadow-lg z-40">
+                <i data-lucide="x"></i>
+            </button>
+            <div id="scale-wrapper">
+                <div id="resume-output" class="p-12 text-sm">
+                    <!-- Resume content will be injected here -->
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white py-2 px-4 rounded-lg shadow-lg opacity-0 translate-y-2 transition-all duration-300">
+        <p id="toast-message"></p>
+    </div>
+
+    <!-- Floating Preview Toggle Button (Mobile Only) -->
+    <button id="toggle-preview-btn" class="lg:hidden fixed bottom-6 right-6 bg-indigo-600 text-white p-3 rounded-full shadow-lg z-20 flex items-center font-semibold">
+        <i data-lucide="eye" class="w-5 h-5"></i>
+        <span class="ml-2">Preview</span>
+    </button>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+
+    const appState = {
+        isPremium: false,
+        resumeData: {
+            photo: null,
+            name: 'Anjali Sharma',
+            job_title: 'Aspiring Software Engineer',
+            email: 'anjali.sharma@email.com',
+            phone: '+91 98765 43210',
+            location: 'Bengaluru, India',
+            linkedin: 'linkedin.com/in/anjalisharma',
+            summary: 'A highly motivated and results-oriented Computer Science graduate with a strong foundation in software development and data structures. Eager to apply my skills in a challenging role to contribute to innovative projects.',
+            experience: [],
+            internshipExperience: [
+                { id: 1, title: 'Software Development Intern', company: 'Tech Solutions Pvt. Ltd.', location: 'Mumbai', dates: 'June 2023 - Aug 2023', description: '• Collaborated with the development team on a client-facing web application using React and Node.js.\n• Assisted in debugging and fixing issues, resulting in a 10% reduction in reported bugs.\n• Participated in daily stand-ups and agile development processes.' }
+            ],
+            education: [
+                 { id: 1, degree: 'Bachelor of Technology in Computer Science', institution: 'Indian Institute of Technology, Delhi', location: 'New Delhi', dates: '2020 - 2024', score: 'CGPA: 8.9/10' }
+            ],
+            technicalSkills: 'Java, Python, JavaScript, React.js, Node.js, SQL, Git, Data Structures, Algorithms',
+            softSkills: 'Team Collaboration, Problem Solving, Communication, Agile Methodologies',
+            certifications: [
+                {id: 1, name: 'Certified Java Programmer', authority: 'Oracle', date: '2023'}
+            ],
+            achievements: [
+                {id: 1, description: 'Dean\'s List for academic excellence for 4 consecutive semesters.'}
+            ],
+            volunteering: [
+                {id: 1, role: 'Teaching Assistant', organization: 'Teach for India', dates: '2022-2023', description: 'Mentored underprivileged students in mathematics and science.'}
+            ],
+            hackathons: [
+                {id: 1, name: 'Smart India Hackathon 2023', achievement: 'Top 10 Finalist', description: 'Developed a prototype for a waste management system using IoT.'}
+            ],
+            extracurriculars: [
+                {id: 1, name: 'Head of Coding Club', description: 'Organized workshops and coding competitions for over 200 students.'}
+            ]
+        },
+        sections: [
+            { key: 'photo', label: 'Photo', enabled: true },
+            { key: 'summary', label: 'Summary', enabled: true },
+            { key: 'workExperience', label: 'Work Experience', enabled: true },
+            { key: 'internshipExperience', label: 'Internships', enabled: true },
+            { key: 'education', label: 'Education', enabled: true },
+            { key: 'technicalSkills', label: 'Technical Skills', enabled: true },
+            { key: 'softSkills', label: 'Soft Skills', enabled: true },
+            { key: 'certifications', label: 'Certifications', enabled: true },
+            { key: 'achievements', label: 'Achievements', enabled: true },
+            { key: 'volunteering', label: 'Volunteering', enabled: true },
+            { key: 'hackathons', label: 'Hackathons', enabled: true },
+            { key: 'extracurriculars', label: 'Extracurriculars', enabled: true },
+        ],
+        selectedTemplate: 'modern',
+    };
+
+    // --- TEMPLATE SECTION RENDERERS ---
+    const sectionRenderers = {
+        modern: {
+            summary: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">PROFESSIONAL SUMMARY</h2><p class="text-gray-700">${data.summary}</p></section>`,
+            workExperience: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">WORK EXPERIENCE</h2><div class="space-y-4">${data.experience.map(exp => `<div class="pdf-item-break"><div class="flex justify-between items-baseline"><h3 class="font-semibold text-gray-800">${exp.title}</h3><span class="text-xs font-medium text-gray-500">${exp.dates}</span></div><div class="flex justify-between items-baseline"><p class="text-sm text-gray-600">${exp.company}</p><span class="text-xs text-gray-500">${exp.location}</span></div><ul class="list-disc list-inside mt-1 text-sm text-gray-700 whitespace-pre-line">${exp.description}</ul></div>`).join('')}</div></section>`,
+            internshipExperience: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">INTERNSHIPS</h2><div class="space-y-4">${data.internshipExperience.map(exp => `<div class="pdf-item-break"><div class="flex justify-between items-baseline"><h3 class="font-semibold text-gray-800">${exp.title}</h3><span class="text-xs font-medium text-gray-500">${exp.dates}</span></div><div class="flex justify-between items-baseline"><p class="text-sm text-gray-600">${exp.company}</p><span class="text-xs text-gray-500">${exp.location}</span></div><ul class="list-disc list-inside mt-1 text-sm text-gray-700 whitespace-pre-line">${exp.description}</ul></div>`).join('')}</div></section>`,
+            education: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">EDUCATION</h2><div class="space-y-2">${data.education.map(edu => `<div class="pdf-item-break"><div class="flex justify-between items-baseline"><h3 class="font-semibold text-gray-800">${edu.degree}</h3><span class="text-xs font-medium text-gray-500">${edu.dates}</span></div><div class="flex justify-between items-baseline"><p class="text-sm text-gray-600">${edu.institution}</p><span class="text-xs text-gray-500">${edu.location}</span></div><p class="text-sm text-gray-600">${edu.score}</p></div>`).join('')}</div></section>`,
+            technicalSkills: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">TECHNICAL SKILLS</h2><div class="flex flex-wrap gap-2">${(data.technicalSkills || '').split(',').map(skill => skill.trim() ? `<span class="bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded-full">${skill.trim()}</span>` : '').join('')}</div></section>`,
+            softSkills: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">SOFT SKILLS</h2><div class="flex flex-wrap gap-2">${(data.softSkills || '').split(',').map(skill => skill.trim() ? `<span class="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full">${skill.trim()}</span>` : '').join('')}</div></section>`,
+            certifications: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">CERTIFICATIONS</h2><div class="space-y-2">${data.certifications.map(cert => `<p class="pdf-item-break text-sm text-gray-700"><span class="font-semibold">${cert.name}</span> from ${cert.authority} (${cert.date})</p>`).join('')}</div></section>`,
+            achievements: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">ACHIEVEMENTS</h2><ul class="list-disc list-inside text-sm text-gray-700 space-y-1">${data.achievements.map(ach => `<li class="pdf-item-break">${ach.description}</li>`).join('')}</ul></section>`,
+            volunteering: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">VOLUNTEERING</h2><div class="space-y-4">${data.volunteering.map(vol => `<div class="pdf-item-break"><div class="flex justify-between items-baseline"><h3 class="font-semibold text-gray-800">${vol.role}</h3><span class="text-xs font-medium text-gray-500">${vol.dates}</span></div><p class="text-sm text-gray-600">${vol.organization}</p><p class="text-sm text-gray-700 mt-1">${vol.description}</p></div>`).join('')}</div></section>`,
+            hackathons: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">HACKATHONS & COMPETITIONS</h2><div class="space-y-4">${data.hackathons.map(hack => `<div class="pdf-item-break"><h3 class="font-semibold text-gray-800">${hack.name} - <span class="font-medium text-indigo-600">${hack.achievement}</span></h3><p class="text-sm text-gray-700 mt-1">${hack.description}</p></div>`).join('')}</div></section>`,
+            extracurriculars: data => `<section class="pdf-section-break"><h2 class="text-lg font-bold text-indigo-700 border-b-2 border-indigo-200 pb-1 mb-2">EXTRACURRICULARS</h2><div class="space-y-2">${data.extracurriculars.map(extra => `<div class="pdf-item-break"><h3 class="font-semibold text-gray-800">${extra.name}</h3><p class="text-sm text-gray-700 mt-1">${extra.description}</p></div>`).join('')}</div></section>`,
+        },
+        classic: {
+            summary: data => `<section class="pdf-section-break"><h2 class="text-base font-bold font-serif tracking-widest text-gray-800 border-b-2 border-gray-300 pb-1 mb-2">SUMMARY</h2><p class="text-gray-700">${data.summary}</p></section>`,
+            workExperience: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold font-serif tracking-widest text-gray-800 border-b-2 border-gray-300 pb-1 mb-2">EXPERIENCE</h2><div class="space-y-4">${data.experience.map(exp => `<div class="pdf-item-break"><h3 class="font-bold text-gray-800">${exp.title} | ${exp.company}</h3><div class="flex justify-between text-xs italic text-gray-500 mb-1"><span>${exp.location}</span><span>${exp.dates}</span></div><ul class="list-disc list-inside text-sm text-gray-700 whitespace-pre-line">${exp.description}</ul></div>`).join('')}</div></section>`,
+            internshipExperience: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold font-serif tracking-widest text-gray-800 border-b-2 border-gray-300 pb-1 mb-2">INTERNSHIPS</h2><div class="space-y-4">${data.internshipExperience.map(exp => `<div class="pdf-item-break"><h3 class="font-bold text-gray-800">${exp.title} | ${exp.company}</h3><div class="flex justify-between text-xs italic text-gray-500 mb-1"><span>${exp.location}</span><span>${exp.dates}</span></div><ul class="list-disc list-inside text-sm text-gray-700 whitespace-pre-line">${exp.description}</ul></div>`).join('')}</div></section>`,
+            education: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold font-serif tracking-widest text-gray-800 border-b-2 border-gray-300 pb-1 mb-2">EDUCATION</h2><div class="space-y-2">${data.education.map(edu => `<div class="pdf-item-break"><h3 class="font-bold text-gray-800">${edu.degree}</h3><div class="flex justify-between"><p class="text-sm italic text-gray-600">${edu.institution}, ${edu.location}</p><p class="text-sm italic text-gray-600">${edu.dates}</p></div><p class="text-sm text-gray-600">${edu.score}</p></div>`).join('')}</div></section>`,
+            skills: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold font-serif tracking-widest text-gray-800 border-b-2 border-gray-300 pb-1 mb-2">SKILLS</h2><p class="text-gray-700">${[data.technicalSkills, data.softSkills].filter(Boolean).join(', ')}</p></section>`,
+            certifications: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold font-serif tracking-widest text-gray-800 border-b-2 border-gray-300 pb-1 mb-2">CERTIFICATIONS</h2><div class="space-y-1">${data.certifications.map(cert => `<p class="pdf-item-break text-sm text-gray-700">${cert.name} - ${cert.authority} (${cert.date})</p>`).join('')}</div></section>`,
+            achievements: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold font-serif tracking-widest text-gray-800 border-b-2 border-gray-300 pb-1 mb-2">ACHIEVEMENTS</h2><ul class="list-disc list-inside text-sm text-gray-700 space-y-1">${data.achievements.map(ach => `<li class="pdf-item-break">${ach.description}</li>`).join('')}</ul></section>`,
+        },
+        creative: {
+            summary: data => `<section class="pdf-section-break"><h2 class="text-xl font-bold text-gray-800 border-b-2 border-gray-300 pb-1 mb-2 uppercase tracking-wider">Summary</h2><p class="text-gray-700 text-sm">${data.summary}</p></section>`,
+            workExperience: data => `<section class="pdf-section-break mt-6"><h2 class="text-xl font-bold text-gray-800 border-b-2 border-gray-300 pb-1 mb-2 uppercase tracking-wider">Work Experience</h2><div class="space-y-4">${data.experience.map(exp => `<div class="pdf-item-break"><h3 class="font-semibold text-gray-800">${exp.title}</h3><div class="flex justify-between items-baseline text-xs text-gray-500 mb-1"><span>${exp.company}, ${exp.location}</span><span>${exp.dates}</span></div><ul class="list-disc list-inside text-sm text-gray-700 whitespace-pre-line">${exp.description}</ul></div>`).join('')}</div></section>`,
+            internshipExperience: data => `<section class="pdf-section-break mt-6"><h2 class="text-xl font-bold text-gray-800 border-b-2 border-gray-300 pb-1 mb-2 uppercase tracking-wider">Internships</h2><div class="space-y-4">${data.internshipExperience.map(exp => `<div class="pdf-item-break"><h3 class="font-semibold text-gray-800">${exp.title}</h3><div class="flex justify-between items-baseline text-xs text-gray-500 mb-1"><span>${exp.company}, ${exp.location}</span><span>${exp.dates}</span></div><ul class="list-disc list-inside text-sm text-gray-700 whitespace-pre-line">${exp.description}</ul></div>`).join('')}</div></section>`,
+            education: data => `<section class="pdf-section-break mt-6"><h2 class="text-xl font-bold text-gray-800 border-b-2 border-gray-300 pb-1 mb-2 uppercase tracking-wider">Education</h2><div class="space-y-2">${data.education.map(edu => `<div class="pdf-item-break"><h3 class="font-semibold text-gray-800">${edu.degree}</h3><p class="text-sm text-gray-600">${edu.institution}, ${edu.location}</p><div class="flex justify-between items-baseline text-xs text-gray-500"><span>${edu.score}</span><span>${edu.dates}</span></div></div>`).join('')}</div></section>`,
+            achievements: data => `<section class="pdf-section-break mt-6"><h2 class="text-xl font-bold text-gray-800 border-b-2 border-gray-300 pb-1 mb-2 uppercase tracking-wider">Achievements</h2><ul class="list-disc list-inside text-sm text-gray-700 space-y-1">${data.achievements.map(ach => `<li class="pdf-item-break">${ach.description}</li>`).join('')}</ul></section>`,
+            certifications: data => `<section class="pdf-section-break mt-6"><h2 class="text-xl font-bold text-gray-800 border-b-2 border-gray-300 pb-1 mb-2 uppercase tracking-wider">Certifications</h2><div class="space-y-2">${data.certifications.map(cert => `<p class="pdf-item-break text-sm text-gray-700"><span class="font-semibold">${cert.name}</span>, ${cert.authority} (${cert.date})</p>`).join('')}</div></section>`,
+        },
+        ats: {
+            summary: data => `<section class="pdf-section-break"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Summary</h2><p class="text-sm">${data.summary}</p></section>`,
+            workExperience: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Professional Experience</h2><div class="space-y-3">${data.experience.map(exp => `<div class="pdf-item-break"><h3 class="text-sm font-bold">${exp.title}</h3><p class="text-sm font-semibold">${exp.company}</p><p class="text-sm text-gray-600">${exp.location} | ${exp.dates}</p><ul class="list-disc list-inside mt-1 text-sm whitespace-pre-line">${exp.description}</ul></div>`).join('')}</div></section>`,
+            internshipExperience: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Internship Experience</h2><div class="space-y-3">${data.internshipExperience.map(exp => `<div class="pdf-item-break"><h3 class="text-sm font-bold">${exp.title}</h3><p class="text-sm font-semibold">${exp.company}</p><p class="text-sm text-gray-600">${exp.location} | ${exp.dates}</p><ul class="list-disc list-inside mt-1 text-sm whitespace-pre-line">${exp.description}</ul></div>`).join('')}</div></section>`,
+            education: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Education</h2><div class="space-y-3">${data.education.map(edu => `<div class="pdf-item-break"><h3 class="text-sm font-bold">${edu.degree}</h3><p class="text-sm font-semibold">${edu.institution}, ${edu.location}</p><p class="text-sm text-gray-600">${edu.dates} | ${edu.score}</p></div>`).join('')}</div></section>`,
+            technicalSkills: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Technical Skills</h2><p class="text-sm">${data.technicalSkills}</p></section>`,
+            softSkills: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Soft Skills</h2><p class="text-sm">${data.softSkills}</p></section>`,
+            certifications: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Certifications</h2><div class="space-y-2">${data.certifications.map(c => `<p class="pdf-item-break text-sm">${c.name}, ${c.authority} (${c.date})</p>`).join('')}</div></section>`,
+            achievements: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Achievements</h2><ul class="list-disc list-inside text-sm space-y-1">${data.achievements.map(a => `<li class="pdf-item-break">${a.description}</li>`).join('')}</ul></section>`,
+            volunteering: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Volunteering</h2><div class="space-y-3">${data.volunteering.map(vol => `<div class="pdf-item-break"><h3 class="text-sm font-bold">${vol.role} at ${vol.organization}</h3><p class="text-sm text-gray-600">${vol.dates}</p><p class="text-sm">${vol.description}</p></div>`).join('')}</div></section>`,
+            hackathons: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Hackathons & Competitions</h2><div class="space-y-3">${data.hackathons.map(hack => `<div class="pdf-item-break"><h3 class="text-sm font-bold">${hack.name} - ${hack.achievement}</h3><p class="text-sm">${hack.description}</p></div>`).join('')}</div></section>`,
+            extracurriculars: data => `<section class="pdf-section-break mt-4"><h2 class="text-base font-bold border-b-2 border-black pb-1 mb-2 uppercase">Extracurricular Activities</h2><div class="space-y-3">${data.extracurriculars.map(extra => `<div class="pdf-item-break"><h3 class="text-sm font-bold">${extra.name}</h3><p class="text-sm">${extra.description}</p></div>`).join('')}</div></section>`,
+        }
+    };
+
+    const renderTemplateSections = (template, data, sections) => {
+        const renderer = sectionRenderers[template];
+        if (!renderer) return '';
+        
+        // Filter out the 'photo' key as it's handled separately in the main template
+        const contentSections = sections.filter(s => s.key !== 'photo');
+
+        // Special case for classic template skills
+        if (template === 'classic') {
+            const classicSections = contentSections.filter(s => s.key !== 'technicalSkills' && s.key !== 'softSkills');
+            classicSections.push({ key: 'skills', enabled: sections.find(s => s.key === 'technicalSkills')?.enabled || sections.find(s => s.key === 'softSkills')?.enabled });
+
+             return classicSections.map(s => {
+                const hasData = s.key === 'skills' ? (data.technicalSkills || data.softSkills) : (data[s.key] && (Array.isArray(data[s.key]) ? data[s.key].length > 0 : data[s.key]));
+                return (s.enabled && renderer[s.key] && hasData) ? renderer[s.key](data) : '';
+            }).join('');
+        }
+
+        return contentSections.map(s => {
+            const hasData = data[s.key] && (Array.isArray(data[s.key]) ? data[s.key].length > 0 : data[s.key]);
+            return (s.enabled && renderer[s.key] && hasData) ? renderer[s.key](data) : '';
+        }).join('');
+    };
+
+    // --- FULL TEMPLATES ---
+    const templates = {
+        modern: (data, sections) => `
+            <div class="modern-template">
+                <header class="flex items-center mb-8 pdf-section-break">
+                     ${(sections.find(s=>s.key==='photo')?.enabled && data.photo) ? `<img src="${data.photo}" class="w-32 h-32 rounded-full object-cover mr-8 border-4 border-gray-200">` : ''}
+                    <div class="text-left flex-grow">
+                        <h1 class="text-4xl font-bold text-gray-900">${data.name || ''}</h1>
+                        <p class="text-xl text-indigo-600 font-semibold">${data.job_title || ''}</p>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600">
+                            <span>${data.email || ''}</span>
+                            <span>${data.phone || ''}</span>
+                            <span>${data.location || ''}</span>
+                            <a href="https://${data.linkedin}" target="_blank" class="text-indigo-600">${data.linkedin || ''}</a>
+                        </div>
+                    </div>
+                </header>
+                <div class="space-y-6">
+                ${renderTemplateSections('modern', data, sections)}
+                </div>
+            </div>`,
+        classic: (data, sections) => `
+             <div class="classic-template">
+                <header class="flex items-center mb-6 pdf-section-break">
+                    ${(sections.find(s=>s.key==='photo')?.enabled && data.photo) ? `<img src="${data.photo}" class="w-28 h-28 rounded-md object-cover mr-6">` : ''}
+                    <div class="flex-grow">
+                        <h1 class="text-3xl font-serif font-bold text-gray-900">${data.name || ''}</h1>
+                        <p class="text-lg font-serif text-gray-700">${data.job_title || ''}</p>
+                        <div class="text-xs text-gray-600 border-t border-b border-gray-300 py-1 mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1">
+                            <span>${data.email || ''}</span>
+                            <span>${data.phone || ''}</span>
+                            <span>${data.location || ''}</span>
+                            <a href="https://${data.linkedin}" target="_blank" class="text-gray-800 font-semibold">${data.linkedin || ''}</a>
+                        </div>
+                    </div>
+                 </header>
+                 <div class="space-y-4">
+                    ${renderTemplateSections('classic', data, sections)}
+                 </div>
+             </div>`,
+        creative: (data, sections) => `
+            <div class="creative-template flex" style="min-height: 29.7cm;">
+                <div class="w-1/3 bg-gray-800 text-white p-8 flex flex-col">
+                    <div class="text-center">
+                        ${(sections.find(s=>s.key==='photo')?.enabled && data.photo) ? `<img src="${data.photo}" class="w-32 h-32 rounded-full object-cover mx-auto mb-4 border-4 border-indigo-300">` : ''}
+                        <h1 class="text-3xl font-bold">${data.name || ''}</h1>
+                        <p class="text-lg text-indigo-300">${data.job_title || ''}</p>
+                    </div>
+                    <div class="mt-8 space-y-4 text-xs">
+                        <h2 class="font-bold text-indigo-300 tracking-widest uppercase">Contact</h2>
+                        <p>${data.email || ''}</p>
+                        <p>${data.phone || ''}</p>
+                        <p>${data.location || ''}</p>
+                        <a href="https://${data.linkedin}" target="_blank" class="block break-all text-indigo-300">${data.linkedin || ''}</a>
+                    </div>
+                    ${sections.find(s=>s.key==='technicalSkills')?.enabled && data.technicalSkills ? `<div class="mt-8 pdf-item-break">
+                        <h2 class="font-bold text-indigo-300 tracking-widest uppercase mb-2">Technical Skills</h2>
+                        <div class="flex flex-wrap gap-2">
+                             ${(data.technicalSkills || '').split(',').map(skill => skill.trim() ? `<span class="bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded">${skill.trim()}</span>` : '').join('')}
+                        </div>
+                    </div>` : ''}
+                     ${sections.find(s=>s.key==='softSkills')?.enabled && data.softSkills ? `<div class="mt-8 pdf-item-break">
+                        <h2 class="font-bold text-indigo-300 tracking-widest uppercase mb-2">Soft Skills</h2>
+                        <div class="flex flex-wrap gap-2">
+                             ${(data.softSkills || '').split(',').map(skill => skill.trim() ? `<span class="bg-gray-600 text-white text-xs font-medium px-2 py-1 rounded">${skill.trim()}</span>` : '').join('')}
+                        </div>
+                    </div>` : ''}
+                </div>
+                <div class="w-2/3 p-8 space-y-6">
+                    ${renderTemplateSections('creative', data, sections)}
+                </div>
+            </div>`,
+        ats: (data, sections) => `
+            <div class="ats-template font-sans text-black" style="font-size: 11pt;">
+                <header class="text-center mb-5 pdf-section-break">
+                    <h1 class="text-2xl font-bold">${data.name || ''}</h1>
+                    <p class="mt-1">${data.job_title || ''}</p>
+                    <p class="mt-1 text-sm">
+                        <span>${data.email || ''}</span> | 
+                        <span>${data.phone || ''}</span> | 
+                        <span>${data.location || ''}</span>
+                        ${data.linkedin ? ` | <span>${data.linkedin || ''}</span>` : ''}
+                    </p>
+                </header>
+                <div class="space-y-4">
+                    ${renderTemplateSections('ats', data, sections)}
+                </div>
+            </div>`,
+    };
+
+    // --- UI & State Management ---
+
+    const renderResume = () => {
+        const output = document.getElementById('resume-output');
+        const renderer = templates[appState.selectedTemplate];
+        if (renderer) {
+            output.innerHTML = renderer(appState.resumeData, appState.sections);
+        } else {
+             output.innerHTML = templates.modern(appState.resumeData, appState.sections); // Fallback
+        }
+        setTimeout(updateResumeScale, 50); // Recalculate scale after content changes
+    };
+
+    const updateUIForPremium = () => {
+        const isPremium = appState.isPremium;
+        document.getElementById('premium-creative-overlay').style.display = isPremium ? 'none' : 'flex';
+        document.getElementById('premium-ats-overlay').style.display = isPremium ? 'none' : 'flex';
+
+        if (!isPremium && (appState.selectedTemplate === 'creative' || appState.selectedTemplate === 'ats')) {
+            appState.selectedTemplate = 'modern';
+            document.querySelector('[data-template="modern"]').classList.add('border-indigo-500');
+            document.querySelector('[data-template="creative"]').classList.remove('border-indigo-500');
+            document.querySelector('[data-template="ats"]').classList.remove('border-indigo-500');
+            renderResume();
+            showToast('This template is a premium feature. Switched to Modern.');
+        }
+    };
+    
+    // --- Event Listeners ---
+    
+    // Accordions
+    document.querySelectorAll('.accordion-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const content = document.querySelector(header.dataset.target);
+            const icon = header.querySelector('i[data-lucide]');
+            if(content) content.classList.toggle('hidden');
+            if(icon) icon.classList.toggle('rotate-180');
+        });
+    });
+
+    // Premium Toggle
+    document.getElementById('premium-toggle').addEventListener('change', (e) => {
+        appState.isPremium = e.target.checked;
+        updateUIForPremium();
+        showToast(appState.isPremium ? 'Premium features unlocked!' : 'Premium features locked.');
+    });
+
+    // Template Selection
+    document.querySelectorAll('[data-template]').forEach(templateImg => {
+        templateImg.addEventListener('click', (e) => {
+            const templateName = e.target.dataset.template;
+            if ((templateName === 'creative' || templateName === 'ats') && !appState.isPremium) {
+                showToast('Unlock premium to use this template.');
+                return;
+            }
+            appState.selectedTemplate = templateName;
+            document.querySelectorAll('[data-template]').forEach(img => img.classList.remove('border-indigo-500'));
+            e.target.classList.add('border-indigo-500');
+            renderResume();
+        });
+    });
+
+    // Live resume updates
+    document.getElementById('app').addEventListener('input', (e) => {
+        if (e.target.dataset.resume) {
+            appState.resumeData[e.target.dataset.resume] = e.target.value;
+            renderResume();
+        }
+    });
+
+    // Download PDF
+    document.getElementById('download-pdf').addEventListener('click', () => {
+        // Temporarily scale up for high-quality PDF
+        const resumeOutput = document.getElementById('resume-output');
+        const scaleWrapper = document.getElementById('scale-wrapper');
+        const originalTransform = resumeOutput.style.transform;
+        const originalWrapperHeight = scaleWrapper.style.height;
+        const originalWrapperWidth = scaleWrapper.style.width;
+
+        resumeOutput.style.transform = 'scale(1)';
+        scaleWrapper.style.height = 'auto';
+        scaleWrapper.style.width = 'auto';
+        
+        const opt = {
+            margin:       0,
+            filename:     `${appState.resumeData.name.replace(' ', '_')}_Resume.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 4, letterRendering: true, useCORS: true },
+            jsPDF:        { unit: 'cm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().from(resumeOutput).set(opt).save().then(() => {
+             // Restore the scale after PDF generation
+            resumeOutput.style.transform = originalTransform;
+            scaleWrapper.style.height = originalWrapperHeight;
+            scaleWrapper.style.width = originalWrapperWidth;
+        });
+    });
+
+    // Photo Upload
+    const photoUpload = document.getElementById('photo-upload');
+    const photoPreview = document.getElementById('photo-preview');
+    const removePhotoBtn = document.getElementById('remove-photo');
+
+    photoUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                appState.resumeData.photo = event.target.result;
+                photoPreview.src = event.target.result;
+                renderResume();
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    removePhotoBtn.addEventListener('click', () => {
+        appState.resumeData.photo = null;
+        photoPreview.src = 'https://placehold.co/100x100/E2E8F0/4A5568?text=Photo';
+        photoUpload.value = ''; // Clear the file input
+        renderResume();
+    });
+
+
+    // --- Dynamic Item Creation Functions ---
+    const createItemUI = (id, fields, removeText) => {
+        const div = document.createElement('div');
+        div.className = 'p-3 border rounded-md mb-2 bg-white';
+        div.dataset.id = id;
+        
+        let html = '';
+        fields.forEach(field => {
+            if (field.type === 'grid') {
+                html += '<div class="grid grid-cols-2 gap-2 mb-2">';
+                field.items.forEach(item => {
+                    html += `<input type="text" placeholder="${item.placeholder}" class="p-2 border rounded-md w-full" value="${item.value || ''}" data-field="${item.field}">`;
+                });
+                html += '</div>';
+            } else if (field.type === 'textarea') {
+                 html += `<textarea placeholder="${field.placeholder}" class="p-2 border rounded-md w-full h-20" data-field="${field.field}">${field.value || ''}</textarea>`;
+            } else {
+                html += `<input type="text" placeholder="${field.placeholder}" class="p-2 border rounded-md w-full mb-2" value="${field.value || ''}" data-field="${field.field}">`;
+            }
+        });
+
+        html += `<button class="remove-item text-red-500 text-sm mt-1">${removeText}</button>`;
+        div.innerHTML = html;
+        return div;
+    };
+    
+    const createExperienceUI = (item = {}, isInternship = false) => {
+        const id = item.id || Date.now();
+        const div = document.createElement('div');
+        div.className = 'p-3 border rounded-md mb-2 bg-white';
+        div.dataset.id = id;
+        div.innerHTML = `
+            <input type="text" placeholder="Job Title" class="p-2 border rounded-md w-full mb-2" value="${item.title || ''}" data-field="title">
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <input type="text" placeholder="Company" class="p-2 border rounded-md w-full" value="${item.company || ''}" data-field="company">
+                <input type="text" placeholder="Location" class="p-2 border rounded-md w-full" value="${item.location || ''}" data-field="location">
+            </div>
+            <input type="text" placeholder="Dates (e.g., Jan 2022 - Present)" class="p-2 border rounded-md w-full mb-2" value="${item.dates || ''}" data-field="dates">
+            <textarea placeholder="Job description and achievements..." class="p-2 border rounded-md w-full h-28" data-field="description">${item.description || ''}</textarea>
+            <button class="remove-item text-red-500 text-sm mt-1">Remove</button>
+        `;
+        const listId = isInternship ? 'internship-list' : 'experience-list';
+        document.getElementById(listId).appendChild(div);
+    };
+
+    const setupDynamicSection = (sectionKey, createItemFunc, itemData, addButtonId) => {
+        if (!itemData) return;
+        itemData.forEach(item => createItemFunc(item));
+        document.getElementById(addButtonId).addEventListener('click', () => createItemFunc());
+    };
+    
+    // --- Dynamic Sections ---
+
+    const handleDynamicSectionUpdate = (e, sectionKey) => {
+        if (e.target.dataset.field) {
+            const itemDiv = e.target.closest('[data-id]');
+            const id = Number(itemDiv.dataset.id);
+            let item = appState.resumeData[sectionKey].find(i => i.id === id);
+            if (!item) {
+                item = { id };
+                appState.resumeData[sectionKey].push(item);
+            }
+            item[e.target.dataset.field] = e.target.value;
+            renderResume();
+        }
+        if (e.target.classList.contains('remove-item')) {
+            const itemDiv = e.target.closest('[data-id]');
+            const id = Number(itemDiv.dataset.id);
+            appState.resumeData[sectionKey] = appState.resumeData[sectionKey].filter(i => i.id !== id);
+            itemDiv.remove();
+            renderResume();
+        }
+    };
+    
+    const initializeDynamicSections = () => {
+        // Experience
+        setupDynamicSection('experience', (item) => createExperienceUI(item, false), appState.resumeData.experience, 'add-experience');
+        document.getElementById('experience-list').addEventListener('input', (e) => handleDynamicSectionUpdate(e, 'experience'));
+        document.getElementById('experience-list').addEventListener('click', (e) => handleDynamicSectionUpdate(e, 'experience'));
+
+        // Internships
+        setupDynamicSection('internshipExperience', (item) => createExperienceUI(item, true), appState.resumeData.internshipExperience, 'add-internship');
+        document.getElementById('internship-list').addEventListener('input', (e) => handleDynamicSectionUpdate(e, 'internshipExperience'));
+        document.getElementById('internship-list').addEventListener('click', (e) => handleDynamicSectionUpdate(e, 'internshipExperience'));
+
+        // Education
+        const createEducationItem = (item = {}) => {
+            const id = item.id || Date.now();
+            const div = createItemUI(id, [
+                { type: 'text', placeholder: 'Degree (e.g., B.Tech in CS)', value: item.degree, field: 'degree'},
+                { type: 'grid', items: [
+                    { placeholder: 'Institution', value: item.institution, field: 'institution' },
+                    { placeholder: 'Location', value: item.location, field: 'location' }
+                ]},
+                { type: 'grid', items: [
+                    { placeholder: 'Dates (e.g., 2020 - 2024)', value: item.dates, field: 'dates' },
+                    { placeholder: 'Score (e.g., CGPA: 8.5)', value: item.score, field: 'score' }
+                ]}
+            ], 'Remove Education');
+            document.getElementById('education-list').appendChild(div);
+        };
+        setupDynamicSection('education', createEducationItem, appState.resumeData.education, 'add-education');
+        document.getElementById('education-list').addEventListener('input', (e) => handleDynamicSectionUpdate(e, 'education'));
+        document.getElementById('education-list').addEventListener('click', (e) => handleDynamicSectionUpdate(e, 'education'));
+        
+        // Certifications
+        const createCertificationItem = (item = {}) => {
+            const id = item.id || Date.now();
+            const div = createItemUI(id, [
+                { type: 'text', placeholder: 'Certification Name', value: item.name, field: 'name' },
+                { type: 'grid', items: [
+                     { placeholder: 'Issuing Authority', value: item.authority, field: 'authority' },
+                     { placeholder: 'Date (e.g., 2023)', value: item.date, field: 'date' }
+                ]}
+            ], 'Remove Certification');
+            document.getElementById('certifications-list').appendChild(div);
+        };
+        setupDynamicSection('certifications', createCertificationItem, appState.resumeData.certifications, 'add-certification');
+        document.getElementById('certifications-list').addEventListener('input', (e) => handleDynamicSectionUpdate(e, 'certifications'));
+        document.getElementById('certifications-list').addEventListener('click', (e) => handleDynamicSectionUpdate(e, 'certifications'));
+
+        // Achievements
+        const createAchievementItem = (item = {}) => {
+             const id = item.id || Date.now();
+             const div = createItemUI(id, [
+                { type: 'textarea', placeholder: 'Describe your achievement...', value: item.description, field: 'description' }
+             ], 'Remove Achievement');
+             document.getElementById('achievements-list').appendChild(div);
+        };
+        setupDynamicSection('achievements', createAchievementItem, appState.resumeData.achievements, 'add-achievement');
+        document.getElementById('achievements-list').addEventListener('input', (e) => handleDynamicSectionUpdate(e, 'achievements'));
+        document.getElementById('achievements-list').addEventListener('click', (e) => handleDynamicSectionUpdate(e, 'achievements'));
+
+        // Volunteering
+        const createVolunteeringItem = (item = {}) => {
+             const id = item.id || Date.now();
+             const div = createItemUI(id, [
+                { type: 'grid', items: [
+                     { placeholder: 'Role', value: item.role, field: 'role' },
+                     { placeholder: 'Organization', value: item.organization, field: 'organization' }
+                ]},
+                { type: 'text', placeholder: 'Dates (e.g., 2022-2023)', value: item.dates, field: 'dates' },
+                { type: 'textarea', placeholder: 'Description of your work...', value: item.description, field: 'description' }
+             ], 'Remove');
+             document.getElementById('volunteering-list').appendChild(div);
+        };
+        setupDynamicSection('volunteering', createVolunteeringItem, appState.resumeData.volunteering, 'add-volunteering');
+        document.getElementById('volunteering-list').addEventListener('input', (e) => handleDynamicSectionUpdate(e, 'volunteering'));
+        document.getElementById('volunteering-list').addEventListener('click', (e) => handleDynamicSectionUpdate(e, 'volunteering'));
+
+        // Hackathons
+        const createHackathonItem = (item = {}) => {
+             const id = item.id || Date.now();
+             const div = createItemUI(id, [
+                { type: 'grid', items: [
+                     { placeholder: 'Event Name', value: item.name, field: 'name' },
+                     { placeholder: 'Achievement (e.g., Winner)', value: item.achievement, field: 'achievement' }
+                ]},
+                { type: 'textarea', placeholder: 'Describe the project or achievement...', value: item.description, field: 'description' }
+             ], 'Remove');
+             document.getElementById('hackathons-list').appendChild(div);
+        };
+        setupDynamicSection('hackathons', createHackathonItem, appState.resumeData.hackathons, 'add-hackathon');
+        document.getElementById('hackathons-list').addEventListener('input', (e) => handleDynamicSectionUpdate(e, 'hackathons'));
+        document.getElementById('hackathons-list').addEventListener('click', (e) => handleDynamicSectionUpdate(e, 'hackathons'));
+        
+        // Extracurriculars
+        const createExtracurricularItem = (item = {}) => {
+             const id = item.id || Date.now();
+             const div = createItemUI(id, [
+                { type: 'text', placeholder: 'Activity/Organization Name', value: item.name, field: 'name' },
+                { type: 'textarea', placeholder: 'Describe your role and contributions...', value: item.description, field: 'description' }
+             ], 'Remove');
+             document.getElementById('extracurriculars-list').appendChild(div);
+        };
+        setupDynamicSection('extracurriculars', createExtracurricularItem, appState.resumeData.extracurriculars, 'add-extracurricular');
+        document.getElementById('extracurriculars-list').addEventListener('input', (e) => handleDynamicSectionUpdate(e, 'extracurriculars'));
+        document.getElementById('extracurriculars-list').addEventListener('click', (e) => handleDynamicSectionUpdate(e, 'extracurriculars'));
+    };
+
+    // --- Section Toggles & Reordering ---
+    const renderSectionManager = () => {
+        const container = document.getElementById('section-manage-sections');
+        container.innerHTML = '';
+        appState.sections.forEach(section => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between bg-white p-2 rounded-md border section-manager-item';
+            div.setAttribute('draggable', true);
+            div.dataset.sectionKey = section.key;
+            div.innerHTML = `
+                <div class="flex items-center">
+                    <i data-lucide="grip-vertical" class="cursor-grab text-gray-400 mr-2"></i>
+                    <span class="text-sm font-medium">${section.label}</span>
+                </div>
+                <label class="form-switch">
+                    <input type="checkbox" data-section-toggle="${section.key}" ${section.enabled ? 'checked' : ''}>
+                    <span class="slider"></span>
+                </label>
+            `;
+            container.appendChild(div);
+        });
+        lucide.createIcons();
+    };
+
+    const setupSectionManagerEventListeners = () => {
+        const container = document.getElementById('section-manage-sections');
+        let draggedItem = null;
+
+        container.addEventListener('dragstart', e => {
+            draggedItem = e.target.closest('.section-manager-item');
+            if (draggedItem) {
+                setTimeout(() => draggedItem.classList.add('dragging'), 0);
+            }
+        });
+
+        container.addEventListener('dragend', e => {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+                draggedItem = null;
+            }
+        });
+
+        container.addEventListener('dragover', e => {
+            e.preventDefault();
+            const target = e.target.closest('.section-manager-item');
+            if (target && target !== draggedItem) {
+                 const rect = target.getBoundingClientRect();
+                 const isAfter = e.clientY > rect.top + rect.height / 2;
+                 
+                 document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                 target.classList.add('drag-over');
+
+                 if (isAfter) {
+                    target.after(draggedItem);
+                 } else {
+                    target.before(draggedItem);
+                 }
+            }
+        });
+
+        container.addEventListener('drop', e => {
+            e.preventDefault();
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            const newOrder = Array.from(container.querySelectorAll('.section-manager-item'))
+                                .map(item => item.dataset.sectionKey);
+            
+            appState.sections.sort((a, b) => newOrder.indexOf(a.key) - newOrder.indexOf(b.key));
+            renderResume();
+        });
+
+        container.addEventListener('change', (e) => {
+            if (e.target.dataset.sectionToggle) {
+                const key = e.target.dataset.sectionToggle;
+                const section = appState.sections.find(s => s.key === key);
+                if (section) {
+                    section.enabled = e.target.checked;
+                    toggleSectionInput(key, section.enabled);
+                    renderResume();
+                }
+            }
+        });
+    };
+
+    const toggleSectionInput = (key, isEnabled) => {
+        const sectionEl = document.querySelector(`.section-input[data-section-key="${key}"]`);
+        if (sectionEl) {
+            sectionEl.style.display = isEnabled ? '' : 'none';
+        }
+         // Personal details is always visible for input, but its corresponding section manager toggle works
+        if (key === 'personalDetails') {
+             const el = document.querySelector('.section-input[data-section-key="personalDetails"]');
+             if(el) el.style.display = '';
+        }
+    };
+    
+    // --- Utils ---
+    const showToast = (message, type = 'success') => {
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        toastMessage.textContent = message;
+        toast.className = `fixed bottom-5 right-5 text-white py-2 px-4 rounded-lg shadow-lg opacity-100 translate-y-0 transition-all duration-300 ${type === 'success' ? 'bg-gray-800' : 'bg-red-600'}`;
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(0.5rem)';
+        }, 3000);
+    };
+
+    // --- New Preview Scaling and Toggling ---
+    const togglePreviewBtn = document.getElementById('toggle-preview-btn');
+    const closePreviewBtn = document.getElementById('close-preview-btn');
+    const previewPanel = document.getElementById('preview-panel');
+
+    const updateResumeScale = () => {
+        const scaleWrapper = document.getElementById('scale-wrapper');
+        const resumeOutput = document.getElementById('resume-output');
+        const mainPanel = document.getElementById('preview-panel');
+
+        if (!scaleWrapper || !resumeOutput || mainPanel.clientWidth === 0) return;
+        
+        // A4 width in px at 96dpi is ~794px
+        const A4_PIXEL_WIDTH = 794;
+        const scale = (mainPanel.clientWidth - 48) / A4_PIXEL_WIDTH; // Subtract padding (p-6 = 24px each side)
+
+        resumeOutput.style.transform = `scale(${scale})`;
+        
+        // Adjust the wrapper to contain the scaled element correctly
+        scaleWrapper.style.width = `${resumeOutput.offsetWidth * scale}px`;
+        scaleWrapper.style.height = `${resumeOutput.offsetHeight * scale}px`;
+    };
+
+    togglePreviewBtn.addEventListener('click', () => {
+        previewPanel.classList.remove('hidden');
+        previewPanel.classList.add('flex');
+        // Recalculate scale after the panel is visible
+        setTimeout(updateResumeScale, 50); 
+    });
+
+    closePreviewBtn.addEventListener('click', () => {
+        previewPanel.classList.add('hidden');
+        previewPanel.classList.remove('flex');
+    });
+
+    window.addEventListener('resize', updateResumeScale);
+
+    // --- Initial Load ---
+    const initializeApp = () => {
+        // Populate form with initial data
+        Object.keys(appState.resumeData).forEach(key => {
+            const element = document.getElementById(key);
+            if (element && typeof appState.resumeData[key] === 'string') {
+                element.value = appState.resumeData[key];
+            }
+        });
+
+        renderSectionManager();
+        setupSectionManagerEventListeners();
+        initializeDynamicSections();
+        appState.sections.forEach(section => toggleSectionInput(section.key, section.enabled));
+        
+        renderResume();
+        updateUIForPremium();
+        document.querySelector('.accordion-header')?.click();
+    };
+
+    initializeApp();
+});
+</script>
+
+</body>
+</html>
+
